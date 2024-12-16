@@ -5,13 +5,19 @@ export default eventHandler(async (event) => {
   const { KV } = cloudflare.env
   const { limit, cursor } = await getValidatedQuery(event, z.object({
     limit: z.coerce.number().max(1024).default(20),
-    cursor: z.string().trim().max(1024).optional(),
+    cursor: z.string().trim().max(1024).optional().nullable(),
   }).parse)
-  const list = await KV.list({
-    prefix: `link:`,
+
+  const listOptions: { prefix: string; limit: number; cursor?: string } = {
+    prefix: 'link:',
     limit,
-    cursor,
-  })
+  }
+  
+  if (cursor) {
+    listOptions.cursor = cursor
+  }
+
+  const list = await KV.list(listOptions)
   if (Array.isArray(list.keys)) {
     list.links = await Promise.all(list.keys.map(async (key: { name: string }) => {
       const { metadata, value: link } = await KV.getWithMetadata(key.name, { type: 'json' })
